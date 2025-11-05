@@ -1,6 +1,8 @@
+import { Rule, Scope } from 'eslint'
 import ESTree from 'estree'
 import {
   dereference,
+  findParent,
   getStringValue,
   isStringNode,
   StringNode,
@@ -76,6 +78,192 @@ const MatcherAndMessageSchema = {
 
 type MatcherGroups = 'describe' | 'step' | 'test'
 
+/**
+ * Checks if an array element's 'name' property is a string literal or simple template literal.
+ */
+const hasStringNameProperty = (
+  element: ESTree.Expression | ESTree.SpreadElement | null,
+): boolean => {
+  if (!element || element.type !== 'ObjectExpression') {
+    return false
+  }
+
+  const nameProperty = element.properties.find((prop) => {
+    if (prop.type !== 'Property' || prop.key.type !== 'Identifier') {
+      return false
+    }
+    return prop.key.name === 'name'
+  })
+
+  if (!nameProperty || nameProperty.type !== 'Property') {
+    return false
+  }
+
+  return isStringNode(nameProperty.value)
+}
+
+/**
+ * Pattern A: Checks if an identifier comes from a for-of loop destructuring pattern
+ * and if the array elements have string 'name' properties.
+ */
+const isForOfDestructuringPattern = (
+  context: Rule.RuleContext,
+  title: ESTree.Identifier,
+): boolean => {
+  // Find the ForOfStatement that contains this identifier
+  const forOfStatement = findParent(title, 'ForOfStatement')
+  if (!forOfStatement) {
+    return false
+  }
+
+  // Verify the identifier is within the loop body
+  const body = forOfStatement.body
+  if (!body.range || !title.range) {
+    return false
+  }
+  // Check if the identifier is within the body's range
+  if (
+    title.range[0] < body.range[0] ||
+    title.range[1] > body.range[1]
+  ) {
+    return false
+  }
+
+  // Check the left side of the for-of statement
+  const left = forOfStatement.left
+  let objectPattern: ESTree.ObjectPattern | null = null
+
+  if (left.type === 'VariableDeclaration') {
+    const declarator = left.declarations[0]
+    if (!declarator || declarator.id.type !== 'ObjectPattern') {
+      return false
+    }
+    objectPattern = declarator.id
+  } else if (left.type === 'ObjectPattern') {
+    objectPattern = left
+  } else {
+    return false
+  }
+
+  // Check if the title identifier is destructured from the pattern
+  const property = objectPattern.properties.find(
+    (prop) =>
+      prop.type === 'Property' &&
+      prop.value.type === 'Identifier' &&
+      prop.value.name === title.name,
+  )
+  if (!property) {
+    return false
+  }
+
+  // Resolve the right-hand side (the array identifier)
+  const right = forOfStatement.right
+  if (right.type !== 'Identifier') {
+    return false
+  }
+
+  // Try to find the variable declaration by traversing scopes
+  let arrayInit: ESTree.Node | undefined
+  let scope: Scope.Scope | null = context.sourceCode.getScope(right)
+  
+  while (scope && !arrayInit) {
+    const variable = scope.variables.find((v) => v.name === right.name)
+    if (variable && variable.defs.length > 0) {
+      const def = variable.defs[0]
+      if (def.node.type === 'VariableDeclarator' && def.node.init) {
+        arrayInit = def.node.init
+        break
+      }
+    }
+    scope = scope.upper
+  }
+
+  // Fallback to dereference if scope traversal didn't work
+  if (!arrayInit) {
+    arrayInit = dereference(context, right)
+  }
+
+  if (!arrayInit || arrayInit.type !== 'ArrayExpression') {
+    return false
+  }
+
+  // Check if all elements have string 'name' properties
+  // We check all elements to be conservative
+  if (arrayInit.elements.length === 0) {
+    return false
+  }
+
+  return arrayInit.elements.every(hasStringNameProperty)
+}
+
+/**
+ * Pattern B: Checks if a MemberExpression is an array index access pattern
+ * (e.g., cases[0].name) and if the array element has a string 'name' property.
+ */
+const isArrayIndexAccessPattern = (
+  context: Rule.RuleContext,
+  title: ESTree.MemberExpression,
+): boolean => {
+  // Must be a property access like cases[0].name
+  if (title.property.type !== 'Identifier') {
+    return false
+  }
+
+  const propertyName = title.property.name
+  if (propertyName !== 'name') {
+    return false
+  }
+
+  // The object must be a MemberExpression with array access
+  if (title.object.type !== 'MemberExpression') {
+    return false
+  }
+
+  const arrayAccess = title.object
+
+  // Check if it's computed property access (array[index])
+  if (!arrayAccess.computed) {
+    return false
+  }
+
+  const index = arrayAccess.property
+  // Index should be a numeric literal or string literal that can be converted to a number
+  let arrayIndex: number | null = null
+  if (index.type === 'Literal') {
+    if (typeof index.value === 'number') {
+      arrayIndex = index.value
+    } else if (typeof index.value === 'string' && /^\d+$/.test(index.value)) {
+      arrayIndex = parseInt(index.value, 10)
+    }
+  }
+
+  if (arrayIndex === null) {
+    // If index is not a literal, we could check if all elements have string names
+    // but that's more complex. For now, be conservative and only accept literal indices.
+    return false
+  }
+
+  // Resolve the array identifier
+  const arrayIdentifier = arrayAccess.object
+  if (arrayIdentifier.type !== 'Identifier') {
+    return false
+  }
+
+  const arrayInit = dereference(context, arrayIdentifier)
+  if (!arrayInit || arrayInit.type !== 'ArrayExpression') {
+    return false
+  }
+
+  // Check bounds
+  if (arrayIndex < 0 || arrayIndex >= arrayInit.elements.length) {
+    return false
+  }
+
+  // Check if the specific element has a string 'name' property
+  const element = arrayInit.elements[arrayIndex]
+  return hasStringNameProperty(element)
+}
+
 interface Options {
   disallowedWords?: string[]
   ignoreSpaces?: boolean
@@ -132,6 +320,26 @@ export default createRule({
             title.type === 'BinaryExpression' &&
             doesBinaryExpressionContainStringNode(title)
           ) {
+            return
+          }
+
+          // AST-only inference: Check for for-of destructuring pattern
+          // Check the original argument, not the dereferenced title
+          if (
+            argument.type === 'Identifier' &&
+            isForOfDestructuringPattern(context, argument)
+          ) {
+            // Valid: title comes from destructuring a cases array with string names
+            return
+          }
+
+          // AST-only inference: Check for array index access pattern
+          // Check the original argument, not the dereferenced title
+          if (
+            argument.type === 'MemberExpression' &&
+            isArrayIndexAccessPattern(context, argument)
+          ) {
+            // Valid: title comes from array access like cases[0].name
             return
           }
 

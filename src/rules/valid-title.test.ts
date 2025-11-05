@@ -807,6 +807,30 @@ runRuleTester('title-must-be-string', rule, {
         });
       `,
     },
+    // Pattern A: For-of destructuring pattern
+    {
+      code: javascript`
+        const cases = [{ name: 'my first test' }, { name: 'my second test' }];
+        test.describe('Tests with loop', () => {
+          for (const { name } of cases) {
+            test(name, () => {});
+          }
+        });
+      `,
+    },
+    // Pattern B: Array index access pattern
+    {
+      code: javascript`
+        const cases = [{ name: 'first' }, { name: 'second' }];
+        test(cases[0].name, () => {});
+      `,
+    },
+    {
+      code: javascript`
+        const cases = [{ name: 'first' }, { name: 'second' }];
+        test(cases[1].name, () => {});
+      `,
+    },
     // Global aliases
     {
       code: 'it("is a string", () => {});',
