@@ -79,7 +79,8 @@ const MatcherAndMessageSchema = {
 type MatcherGroups = 'describe' | 'step' | 'test'
 
 /**
- * Checks if an array element's 'name' property is a string literal or simple template literal.
+ * Checks if an array element's 'name' property is a string literal or simple
+ * template literal.
  */
 const hasStringNameProperty = (
   element: ESTree.Expression | ESTree.SpreadElement | null,
@@ -103,8 +104,8 @@ const hasStringNameProperty = (
 }
 
 /**
- * Pattern A: Checks if an identifier comes from a for-of loop destructuring pattern
- * and if the array elements have string 'name' properties.
+ * Pattern A: Checks if an identifier comes from a for-of loop destructuring
+ * pattern and if the array elements have string 'name' properties.
  */
 const isForOfDestructuringPattern = (
   context: Rule.RuleContext,
@@ -122,10 +123,7 @@ const isForOfDestructuringPattern = (
     return false
   }
   // Check if the identifier is within the body's range
-  if (
-    title.range[0] < body.range[0] ||
-    title.range[1] > body.range[1]
-  ) {
+  if (title.range[0] < body.range[0] || title.range[1] > body.range[1]) {
     return false
   }
 
@@ -165,7 +163,7 @@ const isForOfDestructuringPattern = (
   // Try to find the variable declaration by traversing scopes
   let arrayInit: ESTree.Node | undefined
   let scope: Scope.Scope | null = context.sourceCode.getScope(right)
-  
+
   while (scope && !arrayInit) {
     const variable = scope.variables.find((v) => v.name === right.name)
     if (variable && variable.defs.length > 0) {
@@ -180,7 +178,10 @@ const isForOfDestructuringPattern = (
 
   // Fallback to dereference if scope traversal didn't work
   if (!arrayInit) {
-    arrayInit = dereference(context, right)
+    const derefResult = dereference(context, right)
+    if (derefResult && 'type' in derefResult) {
+      arrayInit = derefResult as ESTree.Node
+    }
   }
 
   if (!arrayInit || arrayInit.type !== 'ArrayExpression') {
