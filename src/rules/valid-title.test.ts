@@ -747,6 +747,135 @@ runRuleTester('title-must-be-string', rule, {
         },
       ],
     },
+    // Negative test cases for Pattern A: For-of destructuring with non-string name properties
+    {
+      code: javascript`
+        const cases = [{ name: 123 }, { name: 456 }];
+        test.describe('Tests with loop', () => {
+          for (const { name } of cases) {
+            test(name, () => {});
+          }
+        });
+      `,
+      errors: [
+        {
+          column: 10,
+          line: 4,
+          messageId: 'titleMustBeString',
+        },
+      ],
+    },
+    {
+      code: javascript`
+        const cases = [{ name: true }, { name: false }];
+        test.describe('Tests with loop', () => {
+          for (const { name } of cases) {
+            test(name, () => {});
+          }
+        });
+      `,
+      errors: [
+        {
+          column: 10,
+          line: 4,
+          messageId: 'titleMustBeString',
+        },
+      ],
+    },
+    // Negative test cases for Pattern B: Array index access with non-string name properties
+    {
+      code: javascript`
+        const cases = [{ name: 123 }, { name: 456 }];
+        test(cases[0].name, () => {});
+      `,
+      errors: [
+        {
+          column: 6,
+          line: 2,
+          messageId: 'titleMustBeString',
+        },
+      ],
+    },
+    {
+      code: javascript`
+        const cases = [{ name: true }, { name: false }];
+        test(cases[1].name, () => {});
+      `,
+      errors: [
+        {
+          column: 6,
+          line: 2,
+          messageId: 'titleMustBeString',
+        },
+      ],
+    },
+    // Negative test cases: array elements without 'name' property
+    {
+      code: javascript`
+        const cases = [{ title: 'test' }, { title: 'test2' }];
+        test.describe('Tests with loop', () => {
+          for (const { name } of cases) {
+            test(name, () => {});
+          }
+        });
+      `,
+      errors: [
+        {
+          column: 10,
+          line: 4,
+          messageId: 'titleMustBeString',
+        },
+      ],
+    },
+    // Negative test cases: accessing wrong property
+    {
+      code: javascript`
+        const cases = [{ name: 'first' }, { name: 'second' }];
+        test(cases[0].title, () => {});
+      `,
+      errors: [
+        {
+          column: 6,
+          line: 2,
+          messageId: 'titleMustBeString',
+        },
+      ],
+    },
+    // Negative test cases: non-literal array index
+    {
+      code: javascript`
+        const cases = [{ name: 'first' }, { name: 'second' }];
+        const index = 0;
+        test(cases[index].name, () => {});
+      `,
+      errors: [
+        {
+          column: 6,
+          line: 3,
+          messageId: 'titleMustBeString',
+        },
+      ],
+    },
+    // Negative test cases: identifier not from for-of destructuring
+    {
+      code: javascript`
+        const cases = [{ name: 'first' }, { name: 'second' }];
+        let name = 'test';
+        test.describe('Tests', () => {
+          for (const { name } of cases) {
+            // name variable exists but not from destructuring
+          }
+          test(name, () => {});
+        });
+      `,
+      errors: [
+        {
+          column: 8,
+          line: 7,
+          messageId: 'titleMustBeString',
+        },
+      ],
+    },
     // Global aliases
     {
       code: 'it(String(/.+/), () => {});',
