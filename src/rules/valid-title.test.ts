@@ -750,7 +750,7 @@ runRuleTester('title-must-be-string', rule, {
     },
     // Negative test cases for Pattern A: For-of destructuring with non-string name properties
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: 123 }, { name: 456 }];
         test.describe('Tests with loop', () => {
           for (const { name } of cases) {
@@ -767,7 +767,7 @@ runRuleTester('title-must-be-string', rule, {
       ],
     },
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: true }, { name: false }];
         test.describe('Tests with loop', () => {
           for (const { name } of cases) {
@@ -785,7 +785,7 @@ runRuleTester('title-must-be-string', rule, {
     },
     // Negative test cases for Pattern B: Array index access with non-string name properties
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: 123 }, { name: 456 }];
         test(cases[0].name, () => {});
       `,
@@ -798,7 +798,7 @@ runRuleTester('title-must-be-string', rule, {
       ],
     },
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: true }, { name: false }];
         test(cases[1].name, () => {});
       `,
@@ -812,7 +812,7 @@ runRuleTester('title-must-be-string', rule, {
     },
     // Negative test cases: array elements without 'name' property
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ title: 'test' }, { title: 'test2' }];
         test.describe('Tests with loop', () => {
           for (const { name } of cases) {
@@ -830,7 +830,7 @@ runRuleTester('title-must-be-string', rule, {
     },
     // Negative test cases: accessing wrong property
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: 'first' }, { name: 'second' }];
         test(cases[0].title, () => {});
       `,
@@ -844,7 +844,7 @@ runRuleTester('title-must-be-string', rule, {
     },
     // Negative test cases: non-literal array index
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: 'first' }, { name: 'second' }];
         const index = 0;
         test(cases[index].name, () => {});
@@ -859,7 +859,7 @@ runRuleTester('title-must-be-string', rule, {
     },
     // Negative test cases: identifier not from for-of destructuring
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: 'first' }, { name: 'second' }];
         let name = 'test';
         test.describe('Tests', () => {
@@ -939,7 +939,7 @@ runRuleTester('title-must-be-string', rule, {
     },
     // Pattern A: For-of destructuring pattern
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: 'my first test' }, { name: 'my second test' }];
         test.describe('Tests with loop', () => {
           for (const { name } of cases) {
@@ -950,13 +950,13 @@ runRuleTester('title-must-be-string', rule, {
     },
     // Pattern B: Array index access pattern
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: 'first' }, { name: 'second' }];
         test(cases[0].name, () => {});
       `,
     },
     {
-      code: javascript`
+      code: dedent`
         const cases = [{ name: 'first' }, { name: 'second' }];
         test(cases[1].name, () => {});
       `,
